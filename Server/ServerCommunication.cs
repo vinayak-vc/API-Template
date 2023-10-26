@@ -144,7 +144,7 @@ namespace ViitorCloud.API {
             }
         }
 
-        private void SendResponseToAPIMethod<T>(UnityWebRequest request, string url, UnityAction<T> callbackOnSuccess,
+        public void SendResponseToAPIMethod<T>(UnityWebRequest request, string url, UnityAction<T> callbackOnSuccess,
             //For responseCode
             //UnityAction<UnityWebRequest> callbackOnFail) {
             UnityAction<string> callbackOnFail) {
