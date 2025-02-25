@@ -1,8 +1,11 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.IO;
+
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.Networking;
+
 using ViitorCloud.API.StandardTemplates;
 
 namespace ViitorCloud.API {
@@ -13,8 +16,7 @@ namespace ViitorCloud.API {
     public class ServerCommunication : PersistentLazySingleton<ServerCommunication> {
         #region [Server Communication]
 
-        private readonly bool debug = false;
-        public static string CulumusToken = "";
+        public static bool debug = false;
         public static string ViitorCloudToken = "";
 
         /// <summary>
@@ -27,6 +29,19 @@ namespace ViitorCloud.API {
         public void SendRequestPost<T>(string form, string url, UnityAction<T> callbackOnSuccess,
             UnityAction<string> callbackOnFail) {
             StartCoroutine(RequestCoroutinePost(form, url, callbackOnSuccess, callbackOnFail));
+        }
+        
+        
+        /// <summary>
+        /// This method request post method .
+        /// </summary>
+        /// <param name="form">Data send from local in JSON format.</param>
+        /// <param name="url">URL for post method</param>
+        /// <param name="callbackOnSuccess">Callback on success.</param>
+        /// <param name="callbackOnFail">Callback on fail.</param>
+        public void SendRequestPostWithFile<T>(string form, string url, UnityAction<T> callbackOnSuccess,
+            UnityAction<string> callbackOnFail) {
+            StartCoroutine(RequestCoroutinePostMultipart(form, url, callbackOnSuccess, callbackOnFail));
         }
 
         /// <summary>
@@ -70,7 +85,6 @@ namespace ViitorCloud.API {
             }
             using (UnityWebRequest request = UnityWebRequest.Put(url, jsonData)) {
                 request.method = UnityWebRequest.kHttpVerbPOST;
-                request.method = "POST";
                 SetHeader(request);
                 yield return request.SendWebRequest();
                 SendResponseToAPIMethod(request, url, callbackOnSuccess, callbackOnFail);
@@ -84,7 +98,6 @@ namespace ViitorCloud.API {
             }
             using (UnityWebRequest request = UnityWebRequest.Put(url, jsonData)) {
                 request.method = UnityWebRequest.kHttpVerbPUT;
-                request.method = "PUT";
                 SetHeader(request);
                 yield return request.SendWebRequest();
                 SendResponseToAPIMethod(request, url, callbackOnSuccess, callbackOnFail);
@@ -98,9 +111,31 @@ namespace ViitorCloud.API {
             }
             using (UnityWebRequest request = UnityWebRequest.Get(url)) {
                 request.method = UnityWebRequest.kHttpVerbGET;
-                request.method = "GET";
                 SetHeader(request);
                 yield return request.SendWebRequest();
+                SendResponseToAPIMethod(request, url, callbackOnSuccess, callbackOnFail);
+            }
+        }
+
+        private IEnumerator RequestCoroutinePostMultipart<T>(string filePath, string url, UnityAction<T> callbackOnSuccess,
+            UnityAction<string> callbackOnFail) {
+            if (debug) {
+                Debug.Log("url: " + url + " filePath: " + filePath);
+            }
+
+            byte[] fileData = File.ReadAllBytes(filePath);
+            WWWForm form = new WWWForm();
+            form.AddBinaryData("world_data", fileData, "SerializableWorldInformationData.json", "application/json");
+
+            using (UnityWebRequest request = UnityWebRequest.Post(url, form)) {
+                request.SetRequestHeader("accept", "application/json");
+                if (!string.IsNullOrEmpty(ViitorCloudToken)) {
+                    request.SetRequestHeader("Authorization", "Bearer " + ViitorCloudToken);
+                }
+                request.SetRequestHeader("Content-Type", "multipart/form-data");
+
+                yield return request.SendWebRequest();
+
                 SendResponseToAPIMethod(request, url, callbackOnSuccess, callbackOnFail);
             }
         }
@@ -112,7 +147,6 @@ namespace ViitorCloud.API {
             }
             using (UnityWebRequest request = UnityWebRequest.Delete(url)) {
                 request.method = UnityWebRequest.kHttpVerbDELETE;
-                request.method = "DELETE";
                 SetHeader(request);
 
                 yield return request.SendWebRequest();
@@ -149,8 +183,8 @@ namespace ViitorCloud.API {
             //UnityAction<UnityWebRequest> callbackOnFail) {
             UnityAction<string> callbackOnFail) {
             if (request.result == UnityWebRequest.Result.DataProcessingError ||
-                    request.result == UnityWebRequest.Result.ConnectionError ||
-                    request.result == UnityWebRequest.Result.ProtocolError) {
+                request.result == UnityWebRequest.Result.ConnectionError ||
+                request.result == UnityWebRequest.Result.ProtocolError) {
 
                 Debug.LogError("url " + url + " error " + request.error + " error code " + request.responseCode + " Data " + request.downloadHandler.text);
 
@@ -186,6 +220,7 @@ namespace ViitorCloud.API {
             var parsedData = JsonUtility.FromJson<T>(data);
             callbackOnSuccess?.Invoke(parsedData);
         }
-        #endregion [Server Communication]       
+
+        #endregion [Server Communication]
     }
 }
