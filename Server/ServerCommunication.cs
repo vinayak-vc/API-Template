@@ -16,6 +16,8 @@ namespace ViitorCloud.API {
     public class ServerCommunication : PersistentLazySingleton<ServerCommunication> {
         #region [Server Communication]
 
+        public API.Constants.API.Server server = API.Constants.API.Server.Development;
+
         public static bool debug = false;
         public static string ViitorCloudToken = "";
 
