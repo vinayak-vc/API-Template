@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 
@@ -13,11 +13,24 @@ namespace ViitorCloud.API {
     /// This class is responsible for handling REST API requests to remote server.
     /// To extend this class you just need to add new API methods.
     /// </summary>
-    public class ServerCommunication : PersistentLazySingleton<ServerCommunication> {
+    public class ServerCommunication : MonoBehaviour {
         #region [Server Communication]
+        public static ServerCommunication Instance;
 
+        private void Awake() {
+            Singleton();
+        }
+
+        private void Singleton() {
+            if (Instance == null) {
+                Instance = this;
+                DontDestroyOnLoad(gameObject);
+            } else {
+                Destroy(gameObject);
+            }
+        }
+        
         public API.Constants.API.Server server = API.Constants.API.Server.Development;
-
         public static bool debug = false;
         public static string ViitorCloudToken = "";
 
