@@ -54,9 +54,9 @@ namespace ViitorCloud.API {
         /// <param name="url">URL for post method</param>
         /// <param name="callbackOnSuccess">Callback on success.</param>
         /// <param name="callbackOnFail">Callback on fail.</param>
-        public void SendRequestPostWithFile<T>(string form, string url, UnityAction<T> callbackOnSuccess,
+        public void SendRequestPostWithFile<T>(string fieldName,string filePath, string url, UnityAction<T> callbackOnSuccess,
             UnityAction<string> callbackOnFail) {
-            StartCoroutine(RequestCoroutinePostMultipart(form, url, callbackOnSuccess, callbackOnFail));
+            StartCoroutine(RequestCoroutinePostMultipart(fieldName,filePath, url, callbackOnSuccess, callbackOnFail));
         }
 
         /// <summary>
@@ -132,7 +132,7 @@ namespace ViitorCloud.API {
             }
         }
 
-        private IEnumerator RequestCoroutinePostMultipart<T>(string filePath, string url, UnityAction<T> callbackOnSuccess,
+        private IEnumerator RequestCoroutinePostMultipart<T>(string fieldName,string filePath, string url, UnityAction<T> callbackOnSuccess,
             UnityAction<string> callbackOnFail) {
             if (debug) {
                 Debug.Log("url: " + url + " filePath: " + filePath);
@@ -140,14 +140,14 @@ namespace ViitorCloud.API {
 
             byte[] fileData = File.ReadAllBytes(filePath);
             WWWForm form = new WWWForm();
-            form.AddBinaryData("world_data", fileData, "SerializableWorldInformationData.json", "application/json");
+            form.AddBinaryData(fieldName, fileData, Path.GetFileName(filePath), "application/json");
 
             using (UnityWebRequest request = UnityWebRequest.Post(url, form)) {
                 request.SetRequestHeader("accept", "application/json");
                 if (!string.IsNullOrEmpty(ViitorCloudToken)) {
                     request.SetRequestHeader("Authorization", "Bearer " + ViitorCloudToken);
                 }
-                request.SetRequestHeader("Content-Type", "multipart/form-data");
+                //request.SetRequestHeader("Content-Type", "multipart/form-data");
 
                 yield return request.SendWebRequest();
 
