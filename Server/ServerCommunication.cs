@@ -6,6 +6,8 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.Networking;
 
+using static Modules.Utility.Utility;
+
 using ViitorCloud.API.StandardTemplates;
 
 namespace ViitorCloud.API {
@@ -132,13 +134,23 @@ namespace ViitorCloud.API {
             }
         }
 
-        private IEnumerator RequestCoroutinePostMultipart<T>(string fieldName,string filePath, string url, UnityAction<T> callbackOnSuccess,
+        private IEnumerator RequestCoroutinePostMultipart<T>(string fieldName, string filePath, string url, UnityAction<T> callbackOnSuccess,
             UnityAction<string> callbackOnFail) {
             if (debug) {
                 Debug.Log("url: " + url + " filePath: " + filePath);
             }
 
+            // Wait until the file is unlocked
+            while ( IsFileLocked(filePath)) {
+                if (debug) {
+                    Debug.Log($"File {filePath} is locked, waiting...");
+                }
+                yield return new WaitForSeconds(0.5f); // Wait before retrying
+            }
+
+            // Read file data after ensuring it's not locked
             byte[] fileData = File.ReadAllBytes(filePath);
+
             WWWForm form = new WWWForm();
             form.AddBinaryData(fieldName, fileData, Path.GetFileName(filePath), "application/json");
 
@@ -147,13 +159,16 @@ namespace ViitorCloud.API {
                 if (!string.IsNullOrEmpty(ViitorCloudToken)) {
                     request.SetRequestHeader("Authorization", "Bearer " + ViitorCloudToken);
                 }
-                //request.SetRequestHeader("Content-Type", "multipart/form-data");
 
                 yield return request.SendWebRequest();
 
                 SendResponseToAPIMethod(request, url, callbackOnSuccess, callbackOnFail);
             }
         }
+
+// Function to check if a file is locked
+       
+
 
         private IEnumerator RequestCoroutineDelete(string url, UnityAction callbackOnSuccess,
             UnityAction<string> callbackOnFail) {
