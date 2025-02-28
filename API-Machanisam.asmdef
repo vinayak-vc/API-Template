@@ -1,7 +1,7 @@
 {
     "name": "API-Machanisam",
     "rootNamespace": "ViitorCloud.API",
-    "references": [],
+    "references": ["GUID:4c0a89ecb7c6816469a5d227a4b7e1e0"],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
