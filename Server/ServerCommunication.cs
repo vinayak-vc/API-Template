@@ -61,6 +61,20 @@ namespace ViitorCloud.API {
             StartCoroutine(RequestCoroutinePostMultipart(fieldName,filePath, url, callbackOnSuccess, callbackOnFail));
         }
 
+
+        /// <summary>
+        /// This method request post method .
+        /// </summary>
+        /// <param name="form">Data send from local in JSON format.</param>
+        /// <param name="url">URL for post method</param>
+        /// <param name="callbackOnSuccess">Callback on success.</param>
+        /// <param name="callbackOnFail">Callback on fail.</param>
+        public void SendRequestPostWithMultiFile<T>(string url,List<FileUpload> files, UnityAction<T> callbackOnSuccess,
+            UnityAction<string> callbackOnFail) {
+            StartCoroutine(RequestCoroutinePostMultiFilesMultipart(url,files, callbackOnSuccess, callbackOnFail));
+        }
+
+
         /// <summary>
         /// This method request delete method .
         /// </summary>
@@ -136,12 +150,19 @@ namespace ViitorCloud.API {
 
         private IEnumerator RequestCoroutinePostMultipart<T>(string fieldName, string filePath, string url, UnityAction<T> callbackOnSuccess,
             UnityAction<string> callbackOnFail) {
+            if (!File.Exists(filePath)) {
+                Debug.LogError("File not exist: " + filePath);
+                callbackOnFail.Invoke("File not exist: " + filePath);
+                yield break;
+            }
+
+
             if (debug) {
                 Debug.Log("url: " + url + " filePath: " + filePath);
             }
 
             // Wait until the file is unlocked
-            while ( IsFileLocked(filePath)) {
+            while (IsFileLocked(filePath)) {
                 if (debug) {
                     Debug.Log($"File {filePath} is locked, waiting...");
                 }
@@ -153,6 +174,44 @@ namespace ViitorCloud.API {
 
             WWWForm form = new WWWForm();
             form.AddBinaryData(fieldName, fileData, Path.GetFileName(filePath), "application/json");
+
+            using (UnityWebRequest request = UnityWebRequest.Post(url, form)) {
+                request.SetRequestHeader("accept", "application/json");
+                if (!string.IsNullOrEmpty(ViitorCloudToken)) {
+                    request.SetRequestHeader("Authorization", "Bearer " + ViitorCloudToken);
+                }
+
+                yield return request.SendWebRequest();
+
+                SendResponseToAPIMethod(request, url, callbackOnSuccess, callbackOnFail);
+            }
+        }
+        
+        
+        private IEnumerator RequestCoroutinePostMultiFilesMultipart<T>(string url,List<FileUpload> files, UnityAction<T> callbackOnSuccess,
+            UnityAction<string> callbackOnFail) {
+            WWWForm form = new WWWForm();
+            for (int i = 0; i < files.Count; i++) {
+                
+                if (!File.Exists(files[i].filePath)) {
+                    Debug.LogError("File not exist: " + files[i].filePath);
+                    callbackOnFail.Invoke("File not exist: " + files[i].filePath);
+                    yield break;
+                }
+                
+                while (IsFileLocked(files[i].filePath)) {
+                    if (debug) {
+                        Debug.Log($"File {files[i].filePath} is locked, waiting...");
+                    }
+                    yield return new WaitForSeconds(0.5f); // Wait before retrying
+                }
+                if (debug) {
+                    Debug.Log("url: " + url + " filePath: " + files[i].filePath);
+                }
+            // Read file data after ensuring it's not locked
+                byte[] fileData = File.ReadAllBytes(files[i].filePath);
+                form.AddBinaryData(files[i].fieldName, fileData, Path.GetFileName(files[i].filePath), "application/json");
+            }
 
             using (UnityWebRequest request = UnityWebRequest.Post(url, form)) {
                 request.SetRequestHeader("accept", "application/json");
@@ -251,6 +310,11 @@ namespace ViitorCloud.API {
             callbackOnSuccess?.Invoke(parsedData);
         }
 
+        public class FileUpload{
+            public string fieldName;
+            public string filePath;
+        }
+        
         #endregion [Server Communication]
     }
 }
