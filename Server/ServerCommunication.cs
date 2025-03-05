@@ -18,6 +18,10 @@ namespace ViitorCloud.API {
     public class ServerCommunication : MonoBehaviour {
         #region [Server Communication]
         public static ServerCommunication Instance;
+        
+        public API.Constants.API.Server server = API.Constants.API.Server.Development;
+        public static bool debug = false;
+        public static string ViitorCloudToken = "";
 
         private void Awake() {
             Singleton();
@@ -26,20 +30,11 @@ namespace ViitorCloud.API {
         private void Singleton() {
             if (Instance == null) {
                 Instance = this;
-
-                if (server == Constants.API.Server.FromConfig) {
-                    Constants.API.LoadFromConfig();
-                }
-                
                 DontDestroyOnLoad(gameObject);
             } else {
                 Destroy(gameObject);
             }
         }
-        
-        public API.Constants.API.Server server = API.Constants.API.Server.Development;
-        public static bool debug = false;
-        public static string ViitorCloudToken = "";
 
         /// <summary>
         /// This method request post method .
