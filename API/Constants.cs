@@ -30,6 +30,7 @@ namespace ViitorCloud.API.Constants {
         public enum Server {
             Live,
             Development,
+            FromConfig
         }
     }
 }
