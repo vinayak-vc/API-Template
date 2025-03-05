@@ -26,6 +26,11 @@ namespace ViitorCloud.API {
         private void Singleton() {
             if (Instance == null) {
                 Instance = this;
+
+                if (server == Constants.API.Server.FromConfig) {
+                    Constants.API.LoadFromConfig();
+                }
+                
                 DontDestroyOnLoad(gameObject);
             } else {
                 Destroy(gameObject);
