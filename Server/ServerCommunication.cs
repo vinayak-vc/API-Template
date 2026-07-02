@@ -1,27 +1,47 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.Networking;
 
-using static Modules.Utility.Utility;
-
 using ViitorCloud.API.StandardTemplates;
 
 namespace ViitorCloud.API {
     /// <summary>
-    /// This class is responsible for handling REST API requests to remote server.
-    /// To extend this class you just need to add new API methods.
+    /// Handles REST API requests for the package.
     /// </summary>
     public class ServerCommunication : MonoBehaviour {
-        #region [Server Communication]
+        private const int MaxLoggedBodyLength = 512;
+
+        #region Singleton
+
+        /// <summary>
+        /// Gets the active instance.
+        /// </summary>
         public static ServerCommunication Instance;
-        
-        public API.Constants.API.Server server = API.Constants.API.Server.FromConfig;
-        public static bool debug = false;
-        public static string ViitorCloudToken = "";
+
+        /// <summary>
+        /// Selected server environment.
+        /// </summary>
+        public API.Constants.API.Server server = API.Constants.API.Server.Development;
+
+        /// <summary>
+        /// Enables verbose request logging.
+        /// </summary>
+        public static bool debug;
+
+        /// <summary>
+        /// Optional bearer token used for authenticated requests.
+        /// </summary>
+        public static string ViitorCloudToken = string.Empty;
+
+        [SerializeField]
+        [Tooltip("Default timeout in seconds for every request.")]
+        private int defaultTimeout = 20;
 
         private void Awake() {
             Singleton();
@@ -31,290 +51,515 @@ namespace ViitorCloud.API {
             if (Instance == null) {
                 Instance = this;
                 DontDestroyOnLoad(gameObject);
-            } else {
+                LogInfo("Initialized.");
+                return;
+            }
+
+            if (Instance != this) {
+                LogWarning("Duplicate instance detected. Destroying the extra object.");
                 Destroy(gameObject);
             }
         }
 
+        #endregion
+
+        #region Public API
+
         /// <summary>
-        /// This method request post method .
+        /// Sends a GET request and parses the response as <typeparamref name="TResponse"/>.
         /// </summary>
-        /// <param name="form">Data send from local in JSON format.</param>
-        /// <param name="url">URL for post method</param>
-        /// <param name="callbackOnSuccess">Callback on success.</param>
-        /// <param name="callbackOnFail">Callback on fail.</param>
-        public void SendRequestPost<T>(string form, string url, UnityAction<T> callbackOnSuccess,
-            UnityAction<string> callbackOnFail) {
-            StartCoroutine(RequestCoroutinePost(form, url, callbackOnSuccess, callbackOnFail));
-        }
-        
-        
-        /// <summary>
-        /// This method request post method .
-        /// </summary>
-        /// <param name="form">Data send from local in JSON format.</param>
-        /// <param name="url">URL for post method</param>
-        /// <param name="callbackOnSuccess">Callback on success.</param>
-        /// <param name="callbackOnFail">Callback on fail.</param>
-        public void SendRequestPostWithFile<T>(string fieldName,string filePath, string url, UnityAction<T> callbackOnSuccess,
-            UnityAction<string> callbackOnFail) {
-            StartCoroutine(RequestCoroutinePostMultipart(fieldName,filePath, url, callbackOnSuccess, callbackOnFail));
+        public void SendRequestGet<TResponse>(string url, UnityAction<TResponse> callbackOnSuccess,
+            UnityAction<string> callbackOnFail, RequestLogMode logMode = RequestLogMode.Default) {
+            StartCoroutine(SendRequestCoroutine(HttpMethod.Get, url, null, callbackOnSuccess, callbackOnFail, logMode));
         }
 
-
         /// <summary>
-        /// This method request post method .
+        /// Sends a DELETE request.
         /// </summary>
-        /// <param name="form">Data send from local in JSON format.</param>
-        /// <param name="url">URL for post method</param>
-        /// <param name="callbackOnSuccess">Callback on success.</param>
-        /// <param name="callbackOnFail">Callback on fail.</param>
-        public void SendRequestPostWithMultiFile<T>(string url,List<FileUpload> files, UnityAction<T> callbackOnSuccess,
-            UnityAction<string> callbackOnFail) {
-            StartCoroutine(RequestCoroutinePostMultiFilesMultipart(url,files, callbackOnSuccess, callbackOnFail));
-        }
-
-
-        /// <summary>
-        /// This method request delete method .
-        /// </summary>
-        /// <param name="url">URL for delete method</param>
-        /// <param name="callbackOnSuccess">Callback on success.</param>
-        /// <param name="callbackOnFail">Callback on fail.</param>
         public void SendRequestDelete(string url, UnityAction callbackOnSuccess,
-            UnityAction<string> callbackOnFail) {
-            StartCoroutine(RequestCoroutineDelete(url, callbackOnSuccess, callbackOnFail));
+            UnityAction<string> callbackOnFail, RequestLogMode logMode = RequestLogMode.Default) {
+            StartCoroutine(SendDeleteCoroutine(url, callbackOnSuccess, callbackOnFail, logMode));
         }
 
         /// <summary>
-        /// This method request get method .
+        /// Sends a POST request with JSON body and parses the response as <typeparamref name="TResponse"/>.
         /// </summary>
-        /// <param name="url">URL for get method</param>
-        /// <param name="callbackOnSuccess">Callback on success.</param>
-        /// <param name="callbackOnFail">Callback on fail.</param>
-        public void SendRequestGet<T>(string url, UnityAction<T> callbackOnSuccess,
-            UnityAction<string> callbackOnFail) {
-            StartCoroutine(RequestCoroutineGet(url, callbackOnSuccess, callbackOnFail));
+        public void SendRequestPost<TResponse>(string form, string url, UnityAction<TResponse> callbackOnSuccess,
+            UnityAction<string> callbackOnFail, RequestLogMode logMode = RequestLogMode.Default) {
+            StartCoroutine(SendRequestCoroutine(HttpMethod.Post, url, form, callbackOnSuccess, callbackOnFail, logMode));
         }
 
         /// <summary>
-        /// This method request Put method .
+        /// Sends a PUT request with JSON body and parses the response as <typeparamref name="TResponse"/>.
         /// </summary>
-        /// <param name="form">Data send from local in JSON format.</param>
-        /// <param name="url">URL for put method</param>
-        /// <param name="callbackOnSuccess">Callback on success.</param>
-        /// <param name="callbackOnFail">Callback on fail.</param>
-        public void SendRequestPut<T>(string form, string url, UnityAction<T> callbackOnSuccess,
-            UnityAction<string> callbackOnFail) {
-            StartCoroutine(RequestCoroutinePut(form, url, callbackOnSuccess, callbackOnFail));
+        public void SendRequestPut<TResponse>(string form, string url, UnityAction<TResponse> callbackOnSuccess,
+            UnityAction<string> callbackOnFail, RequestLogMode logMode = RequestLogMode.Default) {
+            StartCoroutine(SendRequestCoroutine(HttpMethod.Put, url, form, callbackOnSuccess, callbackOnFail, logMode));
         }
 
-        private IEnumerator RequestCoroutinePost<T>(string jsonData, string url, UnityAction<T> callbackOnSuccess,
-            UnityAction<string> callbackOnFail) {
-            if (debug) {
-                Log("url " + url + " jsonData " + jsonData);
-            }
-            using (UnityWebRequest request = UnityWebRequest.Put(url, jsonData)) {
-                request.method = UnityWebRequest.kHttpVerbPOST;
-                SetHeader(request);
+        /// <summary>
+        /// Uploads a single file using multipart form data and parses the response as <typeparamref name="TResponse"/>.
+        /// </summary>
+        public void SendRequestPostWithFile<TResponse>(string fieldName, string filePath, string url,
+            UnityAction<TResponse> callbackOnSuccess, UnityAction<string> callbackOnFail,
+            RequestLogMode logMode = RequestLogMode.Default) {
+            var files = new List<FileUpload> {
+                new FileUpload {
+                    fieldName = fieldName,
+                    filePath = filePath
+                }
+            };
+
+            StartCoroutine(SendMultipartCoroutine(url, files, callbackOnSuccess, callbackOnFail, logMode));
+        }
+
+        /// <summary>
+        /// Uploads multiple files using multipart form data and parses the response as <typeparamref name="TResponse"/>.
+        /// </summary>
+        public void SendRequestPostWithMultiFile<TResponse>(string url, List<FileUpload> files,
+            UnityAction<TResponse> callbackOnSuccess, UnityAction<string> callbackOnFail,
+            RequestLogMode logMode = RequestLogMode.Default) {
+            StartCoroutine(SendMultipartCoroutine(url, files, callbackOnSuccess, callbackOnFail, logMode));
+        }
+
+        /// <summary>
+        /// Sends a request with a strongly typed request and response body.
+        /// </summary>
+        public void SendJsonRequest<TRequest, TResponse>(HttpMethod method, string url, TRequest requestBody,
+            UnityAction<TResponse> callbackOnSuccess, UnityAction<string> callbackOnFail,
+            IDictionary<string, string> additionalHeaders = null,
+            RequestLogMode logMode = RequestLogMode.Default) where TRequest : class {
+            string json = requestBody == null ? string.Empty : JsonUtility.ToJson(requestBody);
+            StartCoroutine(SendRequestCoroutine(method, url, json, callbackOnSuccess, callbackOnFail, additionalHeaders,
+                logMode));
+        }
+
+        /// <summary>
+        /// Sends a request and returns the raw response text.
+        /// </summary>
+        public void SendRequestRaw(HttpMethod method, string url, string jsonBody,
+            UnityAction<string> callbackOnSuccess, UnityAction<string> callbackOnFail,
+            IDictionary<string, string> additionalHeaders = null,
+            RequestLogMode logMode = RequestLogMode.Default) {
+            StartCoroutine(SendRawRequestCoroutine(method, url, jsonBody, callbackOnSuccess, callbackOnFail,
+                additionalHeaders, logMode));
+        }
+
+        #endregion
+
+        #region Coroutines
+
+        private IEnumerator SendRequestCoroutine<TResponse>(HttpMethod method, string url, string jsonBody,
+            UnityAction<TResponse> callbackOnSuccess, UnityAction<string> callbackOnFail,
+            IDictionary<string, string> additionalHeaders = null,
+            RequestLogMode logMode = RequestLogMode.Default) {
+            using (UnityWebRequest request = CreateRequest(method, url, jsonBody, logMode)) {
+                bool includeJsonContentType = method == HttpMethod.Post || method == HttpMethod.Put;
+                ApplyHeaders(request, additionalHeaders, includeJsonContentType);
+                LogRequestStart(method, url, jsonBody, logMode);
                 yield return request.SendWebRequest();
-                SendResponseToAPIMethod(request, url, callbackOnSuccess, callbackOnFail);
+                HandleTypedResponse(request, method, url, callbackOnSuccess, callbackOnFail, logMode);
             }
         }
 
-        private IEnumerator RequestCoroutinePut<T>(string jsonData, string url, UnityAction<T> callbackOnSuccess,
-            UnityAction<string> callbackOnFail) {
-            if (debug) {
-                Log("url " + url + " jsonData " + jsonData);
-            }
-            using (UnityWebRequest request = UnityWebRequest.Put(url, jsonData)) {
-                request.method = UnityWebRequest.kHttpVerbPUT;
-                SetHeader(request);
+        private IEnumerator SendRawRequestCoroutine(HttpMethod method, string url, string jsonBody,
+            UnityAction<string> callbackOnSuccess, UnityAction<string> callbackOnFail,
+            IDictionary<string, string> additionalHeaders = null,
+            RequestLogMode logMode = RequestLogMode.Default) {
+            using (UnityWebRequest request = CreateRequest(method, url, jsonBody, logMode)) {
+                bool includeJsonContentType = method == HttpMethod.Post || method == HttpMethod.Put;
+                ApplyHeaders(request, additionalHeaders, includeJsonContentType);
+                LogRequestStart(method, url, jsonBody, logMode);
                 yield return request.SendWebRequest();
-                SendResponseToAPIMethod(request, url, callbackOnSuccess, callbackOnFail);
+                HandleRawResponse(request, method, url, callbackOnSuccess, callbackOnFail, logMode);
             }
         }
 
-        private IEnumerator RequestCoroutineGet<T>(string url, UnityAction<T> callbackOnSuccess,
-            UnityAction<string> callbackOnFail) {
-            if (debug) {
-                Log("url " + url);
-            }
-            using (UnityWebRequest request = UnityWebRequest.Get(url)) {
-                request.method = UnityWebRequest.kHttpVerbGET;
-                SetHeader(request);
+        private IEnumerator SendDeleteCoroutine(string url, UnityAction callbackOnSuccess,
+            UnityAction<string> callbackOnFail, RequestLogMode logMode = RequestLogMode.Default) {
+            using (UnityWebRequest request = UnityWebRequest.Delete(url)) {
+                request.timeout = defaultTimeout;
+                ApplyHeaders(request, null, includeJsonContentType: false);
+                LogRequestStart(HttpMethod.Delete, url, null, logMode);
                 yield return request.SendWebRequest();
-                SendResponseToAPIMethod(request, url, callbackOnSuccess, callbackOnFail);
+
+                if (IsRequestError(request)) {
+                    LogRequestFailure(HttpMethod.Delete, url, request, logMode);
+                    callbackOnFail?.Invoke(ExtractErrorMessage(request));
+                    yield break;
+                }
+
+                LogRequestSuccess(HttpMethod.Delete, url, request, logMode);
+                callbackOnSuccess?.Invoke();
             }
         }
 
-        private IEnumerator RequestCoroutinePostMultipart<T>(string fieldName, string filePath, string url, UnityAction<T> callbackOnSuccess,
-            UnityAction<string> callbackOnFail) {
-            if (!File.Exists(filePath)) {
-                LogError("File not exist: " + filePath);
-                callbackOnFail.Invoke("File not exist: " + filePath);
+        private IEnumerator SendMultipartCoroutine<TResponse>(string url, List<FileUpload> files,
+            UnityAction<TResponse> callbackOnSuccess, UnityAction<string> callbackOnFail,
+            RequestLogMode logMode = RequestLogMode.Default) {
+            if (files == null || files.Count == 0) {
+                callbackOnFail?.Invoke("No files were provided.");
                 yield break;
             }
 
-
-            if (debug) {
-                Log("url: " + url + " filePath: " + filePath);
-            }
-
-            // Wait until the file is unlocked
-            while (IsFileLocked(filePath)) {
-                if (debug) {
-                    Log($"File {filePath} is locked, waiting...");
-                }
-                yield return new WaitForSeconds(0.5f); // Wait before retrying
-            }
-
-            // Read file data after ensuring it's not locked
-            byte[] fileData = File.ReadAllBytes(filePath);
-
             WWWForm form = new WWWForm();
-            form.AddBinaryData(fieldName, fileData, Path.GetFileName(filePath), "application/json");
 
-            using (UnityWebRequest request = UnityWebRequest.Post(url, form)) {
-                request.SetRequestHeader("accept", "application/json");
-                if (!string.IsNullOrEmpty(ViitorCloudToken)) {
-                    request.SetRequestHeader("Authorization", "Bearer " + ViitorCloudToken);
-                }
-
-                yield return request.SendWebRequest();
-
-                SendResponseToAPIMethod(request, url, callbackOnSuccess, callbackOnFail);
-            }
-        }
-        
-        
-        private IEnumerator RequestCoroutinePostMultiFilesMultipart<T>(string url,List<FileUpload> files, UnityAction<T> callbackOnSuccess,
-            UnityAction<string> callbackOnFail) {
-            WWWForm form = new WWWForm();
             for (int i = 0; i < files.Count; i++) {
-                
-                if (!File.Exists(files[i].filePath)) {
-                    LogError("File not exist: " + files[i].filePath);
-                    callbackOnFail.Invoke("File not exist: " + files[i].filePath);
+                FileUpload file = files[i];
+                if (file == null || string.IsNullOrWhiteSpace(file.filePath)) {
+                    callbackOnFail?.Invoke("Invalid file upload entry.");
                     yield break;
                 }
-                
-                while (IsFileLocked(files[i].filePath)) {
-                    if (debug) {
-                        Log($"File {files[i].filePath} is locked, waiting...");
-                    }
-                    yield return new WaitForSeconds(0.5f); // Wait before retrying
+
+                if (!File.Exists(file.filePath)) {
+                    LogError("File does not exist: " + file.filePath);
+                    callbackOnFail?.Invoke("File does not exist: " + file.filePath);
+                    yield break;
                 }
-                if (debug) {
-                    Log("url: " + url + " filePath: " + files[i].filePath);
+
+                yield return WaitForUnlockedFileCoroutine(file.filePath, callbackOnFail, logMode);
+                if (IsFileLocked(file.filePath)) {
+                    yield break;
                 }
-            // Read file data after ensuring it's not locked
-                byte[] fileData = File.ReadAllBytes(files[i].filePath);
-                form.AddBinaryData(files[i].fieldName, fileData, Path.GetFileName(files[i].filePath), "application/json");
+
+                byte[] fileData = File.ReadAllBytes(file.filePath);
+                string mimeType = GetMimeType(file.filePath);
+                string fieldName = string.IsNullOrWhiteSpace(file.fieldName) ? "file" : file.fieldName;
+                form.AddBinaryData(fieldName, fileData, Path.GetFileName(file.filePath), mimeType);
+                if (ShouldLogVerbose(logMode)) {
+                    LogInfo($"Prepared upload file: field='{fieldName}', path='{file.filePath}', mime='{mimeType}', size={fileData.Length} bytes");
+                }
             }
 
             using (UnityWebRequest request = UnityWebRequest.Post(url, form)) {
-                request.SetRequestHeader("accept", "application/json");
-                if (!string.IsNullOrEmpty(ViitorCloudToken)) {
-                    request.SetRequestHeader("Authorization", "Bearer " + ViitorCloudToken);
-                }
-
+                request.timeout = defaultTimeout;
+                ApplyHeaders(request, null, includeJsonContentType: false);
+                LogRequestStart(HttpMethod.Post, url, $"multipart[{files.Count}]", logMode);
                 yield return request.SendWebRequest();
 
-                SendResponseToAPIMethod(request, url, callbackOnSuccess, callbackOnFail);
+                HandleTypedResponse(request, HttpMethod.Post, url, callbackOnSuccess, callbackOnFail, logMode);
             }
         }
 
-// Function to check if a file is locked
-       
+        #endregion
 
+        #region Helpers
 
-        private IEnumerator RequestCoroutineDelete(string url, UnityAction callbackOnSuccess,
-            UnityAction<string> callbackOnFail) {
-            if (debug) {
-                Log("url Delete " + url);
-            }
-            using (UnityWebRequest request = UnityWebRequest.Delete(url)) {
-                request.method = UnityWebRequest.kHttpVerbDELETE;
-                SetHeader(request);
+        /// <summary>
+        /// Represents an upload payload for multipart requests.
+        /// </summary>
+        [Serializable]
+        public class FileUpload {
+            /// <summary>
+            /// Form field name used by the server.
+            /// </summary>
+            public string fieldName;
 
-                yield return request.SendWebRequest();
-
-                if (request.result == UnityWebRequest.Result.DataProcessingError ||
-                    request.result == UnityWebRequest.Result.ConnectionError ||
-                    request.result == UnityWebRequest.Result.ProtocolError) {
-
-                    LogError("Delete url " + url + " " + request.error);
-                    var apiResponse = JsonUtility.FromJson<APIResponse>(request.downloadHandler.text);
-                    callbackOnFail?.Invoke(apiResponse.message);
-
-                    if (debug) {
-                        Log("Delete url " + url + " Data " + request.downloadHandler.text);
-                    }
-                } else {
-                    callbackOnSuccess.Invoke();
-                }
-            }
+            /// <summary>
+            /// Absolute or project-relative file path.
+            /// </summary>
+            public string filePath;
         }
 
-        private void SetHeader(UnityWebRequest request) {
-            request.timeout = 20;
-            request.SetRequestHeader("Content-Type", "application/json");
+        private UnityWebRequest CreateRequest(HttpMethod method, string url, string jsonBody, RequestLogMode logMode) {
+            if (ShouldLogVerbose(logMode)) {
+                LogInfo($"{method} {url} body: {FormatBodyForLog(jsonBody)}");
+            }
+
+            UnityWebRequest request;
+            switch (method) {
+                case HttpMethod.Get:
+                    request = UnityWebRequest.Get(url);
+                    break;
+                case HttpMethod.Delete:
+                    request = UnityWebRequest.Delete(url);
+                    break;
+                default:
+                    byte[] bodyRaw = string.IsNullOrEmpty(jsonBody) ? Array.Empty<byte>() : Encoding.UTF8.GetBytes(jsonBody);
+                    request = new UnityWebRequest(url, method.ToUnityVerb()) {
+                        uploadHandler = new UploadHandlerRaw(bodyRaw),
+                        downloadHandler = new DownloadHandlerBuffer()
+                    };
+                    break;
+            }
+
+            request.timeout = defaultTimeout;
+            return request;
+        }
+
+        private void ApplyHeaders(UnityWebRequest request, IDictionary<string, string> additionalHeaders,
+            bool includeJsonContentType = true) {
+            if (includeJsonContentType) {
+                request.SetRequestHeader("Content-Type", "application/json");
+            }
+
             request.SetRequestHeader("Accept", "application/json");
 
             if (!string.IsNullOrEmpty(ViitorCloudToken)) {
                 request.SetRequestHeader("Authorization", "Bearer " + ViitorCloudToken);
             }
-        }
 
-        public void SendResponseToAPIMethod<T>(UnityWebRequest request, string url, UnityAction<T> callbackOnSuccess,
-            //For responseCode
-            //UnityAction<UnityWebRequest> callbackOnFail) {
-            UnityAction<string> callbackOnFail) {
-            if (request.result == UnityWebRequest.Result.DataProcessingError ||
-                request.result == UnityWebRequest.Result.ConnectionError ||
-                request.result == UnityWebRequest.Result.ProtocolError) {
+            if (additionalHeaders == null) {
+                return;
+            }
 
-                LogError("url " + url + " error " + request.error + " error code " + request.responseCode + " Data " + request.downloadHandler.text);
-
-                APIResponse apiResponse = JsonUtility.FromJson<APIResponse>(request.downloadHandler.text);
-                if (apiResponse != null) {
-                    callbackOnFail?.Invoke(apiResponse.message);
-                } else {
-                    callbackOnFail?.Invoke(request.error);
-                }
-                //For responseCode
-                //callbackOnFail?.Invoke(request);
-            } else {
-                if (string.IsNullOrEmpty(request.downloadHandler.text)) {
-                    LogError("DownloadHandler text is null");
-                } else {
-                    if (debug) {
-                        Log("url " + url + " Data " + request.downloadHandler.text);
-                    }
-                    ParseResponse(request.downloadHandler.text, callbackOnSuccess);
+            foreach (KeyValuePair<string, string> header in additionalHeaders) {
+                if (!string.IsNullOrWhiteSpace(header.Key)) {
+                    request.SetRequestHeader(header.Key, header.Value);
                 }
             }
         }
 
-        /// <summary>
-        /// This method finishes request process and remove $ sign.
-        /// </summary>
-        /// <param name="data">Data received from server in JSON format.</param>
-        /// <param name="callbackOnSuccess">Callback on success.</param>
-        /// <typeparam name="T">Data Model Type.</typeparam>
-        private void ParseResponse<T>(string data, UnityAction<T> callbackOnSuccess) {
-            data = data.Replace("$oid", "oid");
-            data = data.Replace("$date", "date");
-            var parsedData = JsonUtility.FromJson<T>(data);
-            callbackOnSuccess?.Invoke(parsedData);
+        private void HandleTypedResponse<TResponse>(UnityWebRequest request, HttpMethod method, string url,
+            UnityAction<TResponse> callbackOnSuccess, UnityAction<string> callbackOnFail,
+            RequestLogMode logMode) {
+            if (IsRequestError(request)) {
+                LogRequestFailure(method, url, request, logMode);
+                callbackOnFail?.Invoke(ExtractErrorMessage(request));
+                return;
+            }
+
+            string responseText = request.downloadHandler?.text;
+            if (string.IsNullOrWhiteSpace(responseText)) {
+                callbackOnFail?.Invoke("Server returned an empty response.");
+                return;
+            }
+
+            if (ShouldLogVerbose(logMode)) {
+                LogInfo($"Response from {url}: {FormatBodyForLog(responseText)}");
+            }
+
+            try {
+                callbackOnSuccess?.Invoke(ParseResponse<TResponse>(responseText));
+                LogRequestSuccess(method, url, request, logMode);
+            } catch (Exception exception) {
+                LogError($"Failed to parse response from {url}: {exception.Message}");
+                callbackOnFail?.Invoke("Unable to parse server response.");
+            }
         }
 
-        public class FileUpload{
-            public string fieldName;
-            public string filePath;
+        private void HandleRawResponse(UnityWebRequest request, HttpMethod method, string url, UnityAction<string> callbackOnSuccess,
+            UnityAction<string> callbackOnFail, RequestLogMode logMode) {
+            if (IsRequestError(request)) {
+                LogRequestFailure(method, url, request, logMode);
+                callbackOnFail?.Invoke(ExtractErrorMessage(request));
+                return;
+            }
+
+            string responseText = request.downloadHandler?.text ?? string.Empty;
+            if (ShouldLogVerbose(logMode)) {
+                LogInfo($"Response from {url}: {FormatBodyForLog(responseText)}");
+            }
+
+            LogRequestSuccess(method, url, request, logMode);
+            callbackOnSuccess?.Invoke(responseText);
         }
-        
-        #endregion [Server Communication]
+
+        private static bool IsRequestError(UnityWebRequest request) {
+            return request.result == UnityWebRequest.Result.DataProcessingError ||
+                   request.result == UnityWebRequest.Result.ConnectionError ||
+                   request.result == UnityWebRequest.Result.ProtocolError;
+        }
+
+        private static string ExtractErrorMessage(UnityWebRequest request) {
+            string responseText = request.downloadHandler?.text;
+            if (string.IsNullOrWhiteSpace(responseText)) {
+                return string.IsNullOrWhiteSpace(request.error) ? "Unknown request error." : request.error;
+            }
+
+            try {
+                APIResponse apiResponse = JsonUtility.FromJson<APIResponse>(responseText);
+                if (apiResponse != null && !string.IsNullOrWhiteSpace(apiResponse.message)) {
+                    return apiResponse.message;
+                }
+            } catch {
+                // Fallback below.
+            }
+
+            return string.IsNullOrWhiteSpace(request.error) ? responseText : $"{request.error}: {responseText}";
+        }
+
+        private static T ParseResponse<T>(string data) {
+            data = NormalizeMongoJson(data);
+            return JsonUtility.FromJson<T>(data);
+        }
+
+        private static string NormalizeMongoJson(string data) {
+            if (string.IsNullOrEmpty(data)) {
+                return data;
+            }
+
+            return data.Replace("$oid", "oid")
+                .Replace("$date", "date");
+        }
+
+        private static IEnumerator WaitForUnlockedFileCoroutine(string filePath, UnityAction<string> callbackOnFail,
+            RequestLogMode logMode) {
+            const int maxAttempts = 60;
+            const float delaySeconds = 0.5f;
+
+            for (int attempt = 0; attempt < maxAttempts; attempt++) {
+                if (!IsFileLocked(filePath)) {
+                    yield break;
+                }
+
+                if (ShouldLogVerbose(logMode)) {
+                    LogInfo($"File {filePath} is locked, waiting...");
+                }
+
+                yield return new WaitForSeconds(delaySeconds);
+            }
+
+            callbackOnFail?.Invoke($"File is locked and could not be read in time: {filePath}");
+        }
+
+        private static bool IsFileLocked(string filePath) {
+            try {
+                using (FileStream stream = File.Open(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) {
+                    return false;
+                }
+            } catch (IOException) {
+                return true;
+            }
+        }
+
+        private static string GetMimeType(string filePath) {
+            string extension = Path.GetExtension(filePath)?.ToLowerInvariant();
+            switch (extension) {
+                case ".json":
+                    return "application/json";
+                case ".png":
+                    return "image/png";
+                case ".jpg":
+                case ".jpeg":
+                    return "image/jpeg";
+                case ".gif":
+                    return "image/gif";
+                case ".pdf":
+                    return "application/pdf";
+                case ".txt":
+                    return "text/plain";
+                default:
+                    return "application/octet-stream";
+            }
+        }
+
+        private static void LogInfo(string message) {
+            Debug.Log("[ServerCommunication] " + message);
+        }
+
+        private static void LogWarning(string message) {
+            Debug.LogWarning("[ServerCommunication] " + message);
+        }
+
+        private static void LogError(string message) {
+            Debug.LogError("[ServerCommunication] " + message);
+        }
+
+        private void LogRequestStart(HttpMethod method, string url, string body, RequestLogMode logMode) {
+            if (!ShouldLogVerbose(logMode)) {
+                return;
+            }
+
+            LogInfo($"[{method}] START {url}{(string.IsNullOrEmpty(body) ? string.Empty : $" | body={FormatBodyForLog(body)}")}");
+        }
+
+        private void LogRequestSuccess(HttpMethod method, string url, UnityWebRequest request, RequestLogMode logMode) {
+            if (!ShouldLogVerbose(logMode)) {
+                return;
+            }
+
+            LogInfo($"[{method}] OK {url} | status={(long)request.responseCode} | bytes={request.downloadedBytes}");
+        }
+
+        private void LogRequestFailure(HttpMethod method, string url, UnityWebRequest request, RequestLogMode logMode) {
+            string responseText = request.downloadHandler?.text;
+            LogError($"[{method}] FAIL {url} | status={(long)request.responseCode} | error={request.error} | body={FormatBodyForLog(responseText)}");
+        }
+
+        private static string FormatBodyForLog(string body) {
+            if (string.IsNullOrEmpty(body)) {
+                return "<empty>";
+            }
+
+            string trimmed = body.Trim();
+            if (trimmed.Length <= MaxLoggedBodyLength) {
+                return trimmed;
+            }
+
+            return trimmed.Substring(0, MaxLoggedBodyLength) + "...(truncated)";
+        }
+
+        private static bool ShouldLogVerbose(RequestLogMode logMode) {
+            switch (logMode) {
+                case RequestLogMode.Quiet:
+                    return false;
+                case RequestLogMode.Verbose:
+                    return true;
+                default:
+                    return debug;
+            }
+        }
+
+        #endregion
+
+        #region Types
+
+        /// <summary>
+        /// Common HTTP verbs supported by the client.
+        /// </summary>
+        public enum HttpMethod {
+            /// <summary>GET.</summary>
+            Get,
+
+            /// <summary>POST.</summary>
+            Post,
+
+            /// <summary>PUT.</summary>
+            Put,
+
+            /// <summary>DELETE.</summary>
+            Delete
+        }
+
+        /// <summary>
+        /// Controls how much logging a request should produce.
+        /// </summary>
+        public enum RequestLogMode {
+            /// <summary>
+            /// Uses the global <see cref="debug"/> flag.
+            /// </summary>
+            Default,
+
+            /// <summary>
+            /// Suppresses request lifecycle and body logs for this request.
+            /// Errors are still reported.
+            /// </summary>
+            Quiet,
+
+            /// <summary>
+            /// Forces request lifecycle and body logs for this request.
+            /// </summary>
+            Verbose
+        }
+
+        #endregion
+    }
+
+    internal static class HttpMethodExtensions {
+        public static string ToUnityVerb(this ServerCommunication.HttpMethod method) {
+            switch (method) {
+                case ServerCommunication.HttpMethod.Get:
+                    return UnityWebRequest.kHttpVerbGET;
+                case ServerCommunication.HttpMethod.Post:
+                    return UnityWebRequest.kHttpVerbPOST;
+                case ServerCommunication.HttpMethod.Put:
+                    return UnityWebRequest.kHttpVerbPUT;
+                case ServerCommunication.HttpMethod.Delete:
+                    return UnityWebRequest.kHttpVerbDELETE;
+                default:
+                    return UnityWebRequest.kHttpVerbGET;
+            }
+        }
     }
 }
