@@ -1,7 +1,7 @@
 {
   "name": "com.viitorcloud.apimechanism",
   "displayName": "ViitorCloud REST API Mechanism",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "unity": "2022.3",
   "description": "A lightweight Unity REST API wrapper with typed requests, multipart uploads, configurable environments, and per-request logging.",
   "author": {
