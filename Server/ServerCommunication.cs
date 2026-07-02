@@ -130,8 +130,7 @@ namespace ViitorCloud.API {
             RequestLogMode logMode = RequestLogMode.Default,
             IDictionary<string, string> additionalHeaders = null) where TRequest : class {
             string json = requestBody == null ? string.Empty : JsonUtility.ToJson(requestBody);
-            StartCoroutine(SendRequestCoroutine(method, url, json, callbackOnSuccess, callbackOnFail, additionalHeaders,
-                logMode));
+            StartCoroutine(SendRequestCoroutine(method, url, json, callbackOnSuccess, callbackOnFail, logMode,additionalHeaders));
         }
 
         /// <summary>
@@ -142,7 +141,7 @@ namespace ViitorCloud.API {
             RequestLogMode logMode = RequestLogMode.Default,
             IDictionary<string, string> additionalHeaders = null) {
             StartCoroutine(SendRawRequestCoroutine(method, url, jsonBody, callbackOnSuccess, callbackOnFail,
-                additionalHeaders, logMode));
+                logMode, additionalHeaders));
         }
 
         #endregion
