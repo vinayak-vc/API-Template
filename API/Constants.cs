@@ -19,7 +19,7 @@ namespace ViitorCloud.API.Constants {
 
         public static string APIBaseURL {
             get {
-                switch (GameManager.Instance.server) {
+                switch (ServerCommunication.Instance.server) {
                     case Server.Live:
                         return APIProductionBaseURL;
                     case Server.Development:

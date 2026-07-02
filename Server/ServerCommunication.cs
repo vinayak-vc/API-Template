@@ -127,8 +127,8 @@ namespace ViitorCloud.API {
         /// </summary>
         public void SendJsonRequest<TRequest, TResponse>(HttpMethod method, string url, TRequest requestBody,
             UnityAction<TResponse> callbackOnSuccess, UnityAction<string> callbackOnFail,
-            IDictionary<string, string> additionalHeaders = null,
-            RequestLogMode logMode = RequestLogMode.Default) where TRequest : class {
+            RequestLogMode logMode = RequestLogMode.Default,
+            IDictionary<string, string> additionalHeaders = null) where TRequest : class {
             string json = requestBody == null ? string.Empty : JsonUtility.ToJson(requestBody);
             StartCoroutine(SendRequestCoroutine(method, url, json, callbackOnSuccess, callbackOnFail, additionalHeaders,
                 logMode));
@@ -139,8 +139,8 @@ namespace ViitorCloud.API {
         /// </summary>
         public void SendRequestRaw(HttpMethod method, string url, string jsonBody,
             UnityAction<string> callbackOnSuccess, UnityAction<string> callbackOnFail,
-            IDictionary<string, string> additionalHeaders = null,
-            RequestLogMode logMode = RequestLogMode.Default) {
+            RequestLogMode logMode = RequestLogMode.Default,
+            IDictionary<string, string> additionalHeaders = null) {
             StartCoroutine(SendRawRequestCoroutine(method, url, jsonBody, callbackOnSuccess, callbackOnFail,
                 additionalHeaders, logMode));
         }
@@ -151,8 +151,8 @@ namespace ViitorCloud.API {
 
         private IEnumerator SendRequestCoroutine<TResponse>(HttpMethod method, string url, string jsonBody,
             UnityAction<TResponse> callbackOnSuccess, UnityAction<string> callbackOnFail,
-            IDictionary<string, string> additionalHeaders = null,
-            RequestLogMode logMode = RequestLogMode.Default) {
+            RequestLogMode logMode = RequestLogMode.Default,
+            IDictionary<string, string> additionalHeaders = null) {
             using (UnityWebRequest request = CreateRequest(method, url, jsonBody, logMode)) {
                 bool includeJsonContentType = method == HttpMethod.Post || method == HttpMethod.Put;
                 ApplyHeaders(request, additionalHeaders, includeJsonContentType);
@@ -164,8 +164,8 @@ namespace ViitorCloud.API {
 
         private IEnumerator SendRawRequestCoroutine(HttpMethod method, string url, string jsonBody,
             UnityAction<string> callbackOnSuccess, UnityAction<string> callbackOnFail,
-            IDictionary<string, string> additionalHeaders = null,
-            RequestLogMode logMode = RequestLogMode.Default) {
+            RequestLogMode logMode = RequestLogMode.Default,
+            IDictionary<string, string> additionalHeaders = null) {
             using (UnityWebRequest request = CreateRequest(method, url, jsonBody, logMode)) {
                 bool includeJsonContentType = method == HttpMethod.Post || method == HttpMethod.Put;
                 ApplyHeaders(request, additionalHeaders, includeJsonContentType);

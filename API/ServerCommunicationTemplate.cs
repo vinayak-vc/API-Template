@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 
+using UnityEngine;
 using UnityEngine.Events;
 
 using ViitorCloud.API.StandardTemplates;
@@ -40,7 +41,6 @@ namespace ViitorCloud.API {
                 request,
                 callbackOnSuccess,
                 callbackOnFail,
-                null,
                 logMode);
         }
 
@@ -59,7 +59,6 @@ namespace ViitorCloud.API {
                 request,
                 callbackOnSuccess,
                 callbackOnFail,
-                null,
                 logMode);
         }
 
@@ -81,7 +80,8 @@ namespace ViitorCloud.API {
         public void RequestJson<TRequest, TResponse>(ServerCommunication.HttpMethod method, string url, TRequest request,
             UnityAction<TResponse> callbackOnSuccess, UnityAction<string> callbackOnFail,
             ServerCommunication.RequestLogMode logMode = ServerCommunication.RequestLogMode.Default) where TRequest : class {
-            ServerCommunication.Instance.SendJsonRequest(method, url, request, callbackOnSuccess, callbackOnFail, null, logMode);
+            ServerCommunication.Instance.SendJsonRequest(method, url, request, callbackOnSuccess, callbackOnFail,
+                logMode);
         }
 
         /// <summary>
@@ -99,7 +99,7 @@ namespace ViitorCloud.API {
             IDictionary<string, string> additionalHeaders = null,
             ServerCommunication.RequestLogMode logMode = ServerCommunication.RequestLogMode.Default) {
             ServerCommunication.Instance.SendRequestRaw(method, url, jsonBody, callbackOnSuccess, callbackOnFail,
-                additionalHeaders, logMode);
+                logMode, additionalHeaders);
         }
 
         /// <summary>
