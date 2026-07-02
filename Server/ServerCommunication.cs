@@ -112,7 +112,7 @@ namespace ViitorCloud.API {
         private IEnumerator RequestCoroutinePost<T>(string jsonData, string url, UnityAction<T> callbackOnSuccess,
             UnityAction<string> callbackOnFail) {
             if (debug) {
-                Debug.Log("url " + url + " jsonData " + jsonData);
+                Log("url " + url + " jsonData " + jsonData);
             }
             using (UnityWebRequest request = UnityWebRequest.Put(url, jsonData)) {
                 request.method = UnityWebRequest.kHttpVerbPOST;
@@ -125,7 +125,7 @@ namespace ViitorCloud.API {
         private IEnumerator RequestCoroutinePut<T>(string jsonData, string url, UnityAction<T> callbackOnSuccess,
             UnityAction<string> callbackOnFail) {
             if (debug) {
-                Debug.Log("url " + url + " jsonData " + jsonData);
+                Log("url " + url + " jsonData " + jsonData);
             }
             using (UnityWebRequest request = UnityWebRequest.Put(url, jsonData)) {
                 request.method = UnityWebRequest.kHttpVerbPUT;
@@ -138,7 +138,7 @@ namespace ViitorCloud.API {
         private IEnumerator RequestCoroutineGet<T>(string url, UnityAction<T> callbackOnSuccess,
             UnityAction<string> callbackOnFail) {
             if (debug) {
-                Debug.Log("url " + url);
+                Log("url " + url);
             }
             using (UnityWebRequest request = UnityWebRequest.Get(url)) {
                 request.method = UnityWebRequest.kHttpVerbGET;
@@ -151,20 +151,20 @@ namespace ViitorCloud.API {
         private IEnumerator RequestCoroutinePostMultipart<T>(string fieldName, string filePath, string url, UnityAction<T> callbackOnSuccess,
             UnityAction<string> callbackOnFail) {
             if (!File.Exists(filePath)) {
-                Debug.LogError("File not exist: " + filePath);
+                LogError("File not exist: " + filePath);
                 callbackOnFail.Invoke("File not exist: " + filePath);
                 yield break;
             }
 
 
             if (debug) {
-                Debug.Log("url: " + url + " filePath: " + filePath);
+                Log("url: " + url + " filePath: " + filePath);
             }
 
             // Wait until the file is unlocked
             while (IsFileLocked(filePath)) {
                 if (debug) {
-                    Debug.Log($"File {filePath} is locked, waiting...");
+                    Log($"File {filePath} is locked, waiting...");
                 }
                 yield return new WaitForSeconds(0.5f); // Wait before retrying
             }
@@ -194,19 +194,19 @@ namespace ViitorCloud.API {
             for (int i = 0; i < files.Count; i++) {
                 
                 if (!File.Exists(files[i].filePath)) {
-                    Debug.LogError("File not exist: " + files[i].filePath);
+                    LogError("File not exist: " + files[i].filePath);
                     callbackOnFail.Invoke("File not exist: " + files[i].filePath);
                     yield break;
                 }
                 
                 while (IsFileLocked(files[i].filePath)) {
                     if (debug) {
-                        Debug.Log($"File {files[i].filePath} is locked, waiting...");
+                        Log($"File {files[i].filePath} is locked, waiting...");
                     }
                     yield return new WaitForSeconds(0.5f); // Wait before retrying
                 }
                 if (debug) {
-                    Debug.Log("url: " + url + " filePath: " + files[i].filePath);
+                    Log("url: " + url + " filePath: " + files[i].filePath);
                 }
             // Read file data after ensuring it's not locked
                 byte[] fileData = File.ReadAllBytes(files[i].filePath);
@@ -232,7 +232,7 @@ namespace ViitorCloud.API {
         private IEnumerator RequestCoroutineDelete(string url, UnityAction callbackOnSuccess,
             UnityAction<string> callbackOnFail) {
             if (debug) {
-                Debug.Log("url Delete " + url);
+                Log("url Delete " + url);
             }
             using (UnityWebRequest request = UnityWebRequest.Delete(url)) {
                 request.method = UnityWebRequest.kHttpVerbDELETE;
@@ -244,12 +244,12 @@ namespace ViitorCloud.API {
                     request.result == UnityWebRequest.Result.ConnectionError ||
                     request.result == UnityWebRequest.Result.ProtocolError) {
 
-                    Debug.LogError("Delete url " + url + " " + request.error);
+                    LogError("Delete url " + url + " " + request.error);
                     var apiResponse = JsonUtility.FromJson<APIResponse>(request.downloadHandler.text);
                     callbackOnFail?.Invoke(apiResponse.message);
 
                     if (debug) {
-                        Debug.Log("Delete url " + url + " Data " + request.downloadHandler.text);
+                        Log("Delete url " + url + " Data " + request.downloadHandler.text);
                     }
                 } else {
                     callbackOnSuccess.Invoke();
@@ -275,7 +275,7 @@ namespace ViitorCloud.API {
                 request.result == UnityWebRequest.Result.ConnectionError ||
                 request.result == UnityWebRequest.Result.ProtocolError) {
 
-                Debug.LogError("url " + url + " error " + request.error + " error code " + request.responseCode + " Data " + request.downloadHandler.text);
+                LogError("url " + url + " error " + request.error + " error code " + request.responseCode + " Data " + request.downloadHandler.text);
 
                 APIResponse apiResponse = JsonUtility.FromJson<APIResponse>(request.downloadHandler.text);
                 if (apiResponse != null) {
@@ -287,10 +287,10 @@ namespace ViitorCloud.API {
                 //callbackOnFail?.Invoke(request);
             } else {
                 if (string.IsNullOrEmpty(request.downloadHandler.text)) {
-                    Debug.LogError("DownloadHandler text is null");
+                    LogError("DownloadHandler text is null");
                 } else {
                     if (debug) {
-                        Debug.Log("url " + url + " Data " + request.downloadHandler.text);
+                        Log("url " + url + " Data " + request.downloadHandler.text);
                     }
                     ParseResponse(request.downloadHandler.text, callbackOnSuccess);
                 }
