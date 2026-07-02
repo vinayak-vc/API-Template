@@ -19,7 +19,7 @@ namespace ViitorCloud.API {
         #region [Server Communication]
         public static ServerCommunication Instance;
         
-        public API.Constants.API.Server server = API.Constants.API.Server.Development;
+        public API.Constants.API.Server server = API.Constants.API.Server.FromConfig;
         public static bool debug = false;
         public static string ViitorCloudToken = "";
 

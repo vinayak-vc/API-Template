@@ -4,7 +4,7 @@ using UnityEngine.Events;
 using ViitorCloud.API.StandardTemplates;
 
 namespace ViitorCloud.API {
-    public class ServerCommunicationTemplate : PersistentLazySingleton<ServerCommunicationTemplate> {
+    public class ServerCommunicationTemplate : MonoBehaviour {
         #region [API]
         /// <summary>
         /// This method call server API to get Login.
