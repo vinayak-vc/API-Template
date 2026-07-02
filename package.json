@@ -1,13 +1,27 @@
 {
   "name": "com.viitorcloud.apimechanism",
-  "displayName": "API-Mechanism",
-  "version": "1.0.5",
+  "displayName": "ViitorCloud REST API Mechanism",
+  "version": "1.0.6",
   "unity": "2022.3",
-  "author": "Vittorcloud Technologies",
-  "description": "Checkout Readme file.",
-  "dependencies": {
+  "description": "A lightweight Unity REST API wrapper with typed requests, multipart uploads, configurable environments, and per-request logging.",
+  "author": {
+    "name": "ViitorCloud Technologies",
+    "url": "https://viitorcloud.com"
   },
-  "keywords": [ "mechanism", "API", "utitily", "ViitorCloud" ],
+  "keywords": [
+    "rest",
+    "api",
+    "unity",
+    "networking",
+    "http",
+    "utility",
+    "viitorcloud"
+  ],
+  "dependencies": {},
   "repository": {
-  }
+    "type": "git",
+    "url": "https://github.com/vinayak-vc/API-Template.git"
+  },
+  "documentationUrl": "https://github.com/vinayak-vc/API-Template#readme",
+  "changelogUrl": "https://github.com/vinayak-vc/API-Template/releases"
 }
